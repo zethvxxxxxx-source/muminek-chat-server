@@ -16,6 +16,9 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // --- DRUKOWANIE ZAPYTAŃ W LOGACH RENDERA ---
+    console.log(`[HTTP] ${req.method} ${req.url}`);
+
     // WYSYŁANIE WIADOMOŚCI
     if (req.method === 'POST' && req.url === '/send') {
         let body = '';
@@ -24,16 +27,19 @@ const server = http.createServer((req, res) => {
             try {
                 const data = JSON.parse(body);
                 msgCounter++;
-                data.id = msgCounter; // Każda wiadomość dostaje swój numer ID
+                data.id = msgCounter;
                 
                 messageHistory.push(data);
                 if (messageHistory.length > 50) messageHistory.shift();
+
+                console.log(`📩 NOWA WIADOMOŚĆ [#${data.id}] od ${data.senderName}: "${data.text}"`);
 
                 broadcastToWS(data);
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, id: data.id }));
             } catch (e) {
+                console.error("❌ Błąd parsowania JSON:", e.message);
                 res.writeHead(400);
                 res.end('Błąd JSON');
             }
@@ -45,8 +51,6 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url.startsWith('/messages')) {
         const urlParams = new URLSearchParams(req.url.split('?')[1]);
         const sinceId = parseInt(urlParams.get('since') || '0');
-        
-        // Zwracamy tylko wiadomości o numerze wyższym niż ostatnio pobrane
         const newMsgs = messageHistory.filter(m => m.id > sinceId);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -54,7 +58,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // STRONA WWW (PANEL NADAMICZY)
+    // STRONA WWW
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(`
         <!DOCTYPE html>
@@ -83,7 +87,7 @@ const server = http.createServer((req, res) => {
                 <input type="text" id="msg" placeholder="Wpisz treść..." onkeydown="if(event.key==='Enter') sendMsg()">
 
                 <button onclick="sendMsg()">Wyślij do gry 🚀</button>
-                <div id="status">🟢 Serwer HTTP gotowy!</div>
+                <div id="status">🟢 Serwer z logowaniem aktywny!</div>
             </div>
 
             <script>
