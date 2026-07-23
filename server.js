@@ -7,6 +7,7 @@ let msgCounter = 0;
 let messageHistory = [];
 
 const server = http.createServer((req, res) => {
+    // Nagłówki CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -24,7 +25,7 @@ const server = http.createServer((req, res) => {
         console.log(`[HTTP] ${req.method} ${urlPath}`);
     }
 
-    // 1. ODBIERANIE I ZAPISYWANIE WIADOMOŚCI
+    // 1. ODBIERANIE I ZAPISYWANIE WIADOMOŚCI / KOMEND
     if (req.method === 'POST' && urlPath === '/send') {
         let body = '';
         req.on('data', chunk => body += chunk);
@@ -33,11 +34,12 @@ const server = http.createServer((req, res) => {
                 const data = JSON.parse(body);
                 msgCounter++;
                 data.id = msgCounter;
-                
+
                 messageHistory.push(data);
 
                 // 💡 JEŚLI TO KOMENDA (zaczyna się od /):
-                // Usuwamy ją z historii serwera po 3 sekundach!
+                // Usuwamy ją z pamięci serwera po 3 sekundach,
+                // aby v5.4 nie wykonywał starych komend przy ponownym odpaleniu.
                 if (data.text && data.text.startsWith('/')) {
                     setTimeout(() => {
                         messageHistory = messageHistory.filter(m => m.id !== data.id);
@@ -60,10 +62,17 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 2. WYSYŁANIE HISTORII DO ROBLOXA I WWW
+    // 2. WYSYŁANIE HISTORII DO ROBLOXA (v5.4) I PANELU WWW
     if (req.method === 'GET' && urlPath === '/messages') {
-        const urlParams = new URLSearchParams(req.url.split('?')[1]);
-        const sinceId = parseInt(urlParams.get('since') || '0');
+        let sinceId = 0;
+
+        // Bezpieczne wyciąganie parametru 'since' z URL
+        if (req.url.includes('?')) {
+            const queryStr = req.url.split('?')[1] || '';
+            const urlParams = new URLSearchParams(queryStr);
+            sinceId = parseInt(urlParams.get('since') || '0', 10);
+        }
+
         const newMsgs = messageHistory.filter(m => m.id > sinceId);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -85,7 +94,7 @@ const server = http.createServer((req, res) => {
                 .card { background: #181820; padding: 20px; border-radius: 12px; width: 360px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); border: 1px solid #282838; }
                 h2 { margin: 0 0 10px 0; color: #00aaff; font-size: 18px; text-align: center; }
                 #chatBox { background: #101014; height: 220px; border-radius: 8px; padding: 10px; overflow-y: auto; border: 1px solid #282838; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
-                .msg { background: #222230; padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; }
+                .msg { background: #222230; padding: 6px 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; word-break: break-word; }
                 .nick { color: #00aaff; font-weight: bold; }
                 input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #333; background: #222230; color: #fff; box-sizing: border-box; outline: none; margin-bottom: 8px; font-size: 12px; }
                 button { width: 100%; padding: 10px; border-radius: 6px; border: none; background: #00aaff; color: #fff; font-weight: bold; cursor: pointer; }
@@ -107,16 +116,27 @@ const server = http.createServer((req, res) => {
                 async function fetchMessages() {
                     try {
                         const res = await fetch('/messages?since=' + lastId);
+                        if (!res.ok) return;
                         const msgs = await res.json();
                         const box = document.getElementById('chatBox');
-                        
+
                         msgs.forEach(m => {
                             if (m.id > lastId) {
                                 lastId = m.id;
+
                                 const div = document.createElement('div');
                                 div.className = 'msg';
-                                div.innerHTML = "<span class='nick'>" + m.senderName + ":</span> " + m.text;
+
+                                const nickSpan = document.createElement('span');
+                                nickSpan.className = 'nick';
+                                nickSpan.textContent = (m.senderName || 'Anonim') + ': ';
+
+                                const textNode = document.createTextNode(m.text || '');
+
+                                div.appendChild(nickSpan);
+                                div.appendChild(textNode);
                                 box.appendChild(div);
+
                                 box.scrollTop = box.scrollHeight;
                             }
                         });
@@ -124,8 +144,10 @@ const server = http.createServer((req, res) => {
                 }
 
                 async function sendMsg() {
-                    const nick = document.getElementById('nick').value.trim() || 'Muminek';
-                    const text = document.getElementById('msg').value.trim();
+                    const nickInput = document.getElementById('nick');
+                    const msgInput = document.getElementById('msg');
+                    const nick = nickInput.value.trim() || 'Muminek';
+                    const text = msgInput.value.trim();
                     if (!text) return;
 
                     await fetch('/send', {
@@ -134,7 +156,7 @@ const server = http.createServer((req, res) => {
                         body: JSON.stringify({ senderName: "👑 " + nick, userId: 1, text: text })
                     });
 
-                    document.getElementById('msg').value = '';
+                    msgInput.value = '';
                     fetchMessages();
                 }
 
