@@ -35,7 +35,18 @@ const server = http.createServer((req, res) => {
                 data.id = msgCounter;
                 
                 messageHistory.push(data);
-                if (messageHistory.length > 50) messageHistory.shift();
+
+                // 💡 JEŚLI TO KOMENDA (zaczyna się od /):
+                // Usuwamy ją z historii serwera po 3 sekundach!
+                if (data.text && data.text.startsWith('/')) {
+                    setTimeout(() => {
+                        messageHistory = messageHistory.filter(m => m.id !== data.id);
+                    }, 3000);
+                } 
+                // Zwykłe wiadomości trzymamy (max 50 ostatnich)
+                else if (messageHistory.length > 50) {
+                    messageHistory.shift();
+                }
 
                 console.log(`📩 [#${data.id}] ${data.senderName}: "${data.text}"`);
 
@@ -86,7 +97,7 @@ const server = http.createServer((req, res) => {
                 <h2>👑 Muminek Chat Web</h2>
                 <div id="chatBox"></div>
                 <input type="text" id="nick" value="Muminek" placeholder="Twój Nick">
-                <input type="text" id="msg" placeholder="Wpisz wiadomość do gry..." onkeydown="if(event.key==='Enter') sendMsg()">
+                <input type="text" id="msg" placeholder="Wpisz wiadomość lub /komendę..." onkeydown="if(event.key==='Enter') sendMsg()">
                 <button onclick="sendMsg()">Wyślij do gry 🚀</button>
             </div>
 
