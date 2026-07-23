@@ -37,9 +37,8 @@ const server = http.createServer((req, res) => {
 
                 messageHistory.push(data);
 
-                // 💡 JEŚLI TO KOMENDA (zaczyna się od /):
-                // Usuwamy ją z pamięci serwera po 3 sekundach,
-                // aby v5.4 nie wykonywał starych komend przy ponownym odpaleniu.
+                // JEŚLI TO KOMENDA (zaczyna się od /):
+                // Usuwamy ją z pamięci serwera po 3 sekundach, aby v5.4 nie wykonywał starych komend
                 if (data.text && data.text.startsWith('/')) {
                     setTimeout(() => {
                         messageHistory = messageHistory.filter(m => m.id !== data.id);
@@ -66,7 +65,6 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && urlPath === '/messages') {
         let sinceId = 0;
 
-        // Bezpieczne wyciąganie parametru 'since' z URL
         if (req.url.includes('?')) {
             const queryStr = req.url.split('?')[1] || '';
             const urlParams = new URLSearchParams(queryStr);
@@ -103,7 +101,7 @@ const server = http.createServer((req, res) => {
         </head>
         <body>
             <div class="card">
-                <h2>👑 Muminek Chat Web</h2>
+                <h2>Muminek Chat Web</h2>
                 <div id="chatBox"></div>
                 <input type="text" id="nick" value="Muminek" placeholder="Twój Nick">
                 <input type="text" id="msg" placeholder="Wpisz wiadomość lub /komendę..." onkeydown="if(event.key==='Enter') sendMsg()">
@@ -153,7 +151,7 @@ const server = http.createServer((req, res) => {
                     await fetch('/send', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ senderName: "👑 " + nick, userId: 1, text: text })
+                        body: JSON.stringify({ senderName: nick, userId: 1, text: text })
                     });
 
                     msgInput.value = '';
